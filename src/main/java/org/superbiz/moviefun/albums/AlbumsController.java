@@ -1,6 +1,6 @@
 package org.superbiz.moviefun.albums;
 
-import org.apache.tika.Tika;
+import org.apache.tika.io.IOUtils;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -52,8 +52,7 @@ public class AlbumsController {
 
     @PostMapping("/{albumId}/cover")
     public String uploadCover(@PathVariable long albumId, @RequestParam("file") MultipartFile uploadedFile) throws IOException {
-        InputStream inputStream = uploadedFile.getInputStream();
-        Blob blob = new Blob(getCoverFileName(albumId), inputStream, new Tika().detect(inputStream));
+        Blob blob = new Blob(getCoverFileName(albumId), uploadedFile.getInputStream(), uploadedFile.getContentType());
         blobStore.put(blob);
 
         return format("redirect:/albums/%d", albumId);
@@ -63,8 +62,7 @@ public class AlbumsController {
     public HttpEntity<byte[]> getCover(@PathVariable long albumId) throws IOException {
         Optional<Blob> maybeBlob = blobStore.get(getCoverFileName(albumId));
         Blob blob = maybeBlob.orElseGet(this::defaultBlobCover);
-        byte[] imageBytes = new byte[blob.inputStream.available()];
-        blob.inputStream.read(imageBytes);
+        byte[] imageBytes = IOUtils.toByteArray(blob.inputStream);
         HttpHeaders headers = createImageHttpHeaders(blob, imageBytes);
 
         return new HttpEntity<>(imageBytes, headers);
@@ -78,7 +76,6 @@ public class AlbumsController {
         String defaultName = "default-cover.jpg";
         InputStream inputStream = AlbumsController.class.getClassLoader().getResourceAsStream(defaultName);
         return new Blob(defaultName, inputStream, IMAGE_JPEG_VALUE);
-
     }
 
     private HttpHeaders createImageHttpHeaders(Blob blob, byte[] imageBytes) throws IOException {
